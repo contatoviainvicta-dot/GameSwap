@@ -1,4 +1,13 @@
 import streamlit as st
+import sys
+import os
+from pathlib import Path
+
+# Garante que o diretório do app.py está no Python path
+APP_DIR = Path(__file__).parent.resolve()
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
+
 from database import init_db
 from auth import show_login, show_register, logout
 from marketplace import show_marketplace
@@ -14,9 +23,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Inject custom CSS
-with open("style.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+# Inject custom CSS com caminho absoluto
+css_path = APP_DIR / "style.css"
+if css_path.exists():
+    with open(css_path) as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 init_db()
 
