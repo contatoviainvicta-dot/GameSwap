@@ -3,6 +3,9 @@ import sqlite3
 import hashlib
 import base64
 import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
 
 # ─── CONFIG ───────────────────────────────────────────────────────────────────
@@ -14,7 +17,8 @@ st.set_page_config(
 )
 
 PLATFORM_FEE = 0.05
-DB_PATH = Path(__file__).parent / "gameswap.db"
+# No Streamlit Cloud o filesystem é efêmero; /tmp persiste na sessão
+DB_PATH = Path("/tmp/gameswap.db")
 
 PLATFORMS = ["PlayStation 5", "PlayStation 4", "Xbox Series X/S", "Xbox One",
              "Nintendo Switch", "PC", "Game Boy", "Retro", "Outro"]
@@ -268,11 +272,52 @@ def login_user(username, password):
     conn.close()
     return dict(row) if row else None
 
+def send_welcome_email(to_email, username):
+    """Envia e-mail de boas-vindas via Gmail SMTP configurado nos Secrets do Streamlit."""
+    try:
+        secrets = st.secrets.get("email", {})
+        gmail_user = secrets.get("gmail_user", "")
+        gmail_pass = secrets.get("gmail_pass", "")
+        if not gmail_user or not gmail_pass:
+            return False, "E-mail não configurado nos Secrets."
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "🎮 Bem-vindo ao GameSwap Brasil!"
+        msg["From"]    = f"GameSwap Brasil <{gmail_user}>"
+        msg["To"]      = to_email
+
+        html = f"""
+        <html><body style="font-family:Arial,sans-serif;background:#0d0f14;color:#e8eaf6;padding:30px">
+          <div style="max-width:500px;margin:auto;background:#161a24;border-radius:16px;padding:30px;border:1px solid #2a3050">
+            <h1 style="color:#00e5ff;font-size:1.8rem">🎮 GameSwap Brasil</h1>
+            <h2>Olá, {username}! Seja bem-vindo!</h2>
+            <p>Sua conta foi criada com sucesso. Agora você pode:</p>
+            <ul>
+              <li>📦 Anunciar seus jogos e consoles usados</li>
+              <li>🛒 Comprar e trocar com outros gamers</li>
+              <li>💬 Conversar diretamente com vendedores</li>
+            </ul>
+            <p style="color:#8892b0;font-size:0.85rem">Taxa da plataforma: apenas 5% por transação realizada.</p>
+            <hr style="border-color:#2a3050">
+            <p style="color:#8892b0;font-size:0.8rem">GameSwap Brasil — O marketplace dos gamers 🕹️</p>
+          </div>
+        </body></html>
+        """
+        msg.attach(MIMEText(html, "html"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_user, gmail_pass)
+            server.sendmail(gmail_user, to_email, msg.as_string())
+        return True, "E-mail enviado!"
+    except Exception as e:
+        return False, str(e)
+
 def register_user(username, email, password):
     conn = get_conn()
     try:
         conn.execute("INSERT INTO users (username,email,password_hash) VALUES (?,?,?)", (username,email,hash_pw(password)))
         conn.commit(); conn.close()
+        send_welcome_email(email, username)  # envia boas-vindas (falha silenciosa se não configurado)
         return True, "Cadastro realizado!"
     except sqlite3.IntegrityError as e:
         conn.close()
@@ -318,15 +363,26 @@ if page == "login":
     st.markdown("<h1 class='page-title'>🔐 Login</h1>", unsafe_allow_html=True)
     col,_ = st.columns([1.2,1])
     with col:
+        st.info("⚠️ **Atenção:** O GameSwap usa banco de dados temporário no Streamlit Cloud. Se o app reiniciar, contas antigas são apagadas — **cadastre-se novamente** caso isso ocorra.")
         with st.form("login_form"):
             username = st.text_input("Usuário")
             password = st.text_input("Senha", type="password")
             if st.form_submit_button("Entrar 🎮", use_container_width=True):
-                user = login_user(username, password)
-                if user:
-                    st.session_state.user = user; st.session_state.page = "marketplace"; st.rerun()
+                if not username or not password:
+                    st.error("Preencha todos os campos.")
                 else:
-                    st.error("Usuário ou senha incorretos.")
+                    user = login_user(username, password)
+                    if user:
+                        st.session_state.user = user; st.session_state.page = "marketplace"; st.rerun()
+                    else:
+                        # Verifica se usuário existe (para distinguir erros)
+                        conn = get_conn()
+                        exists = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+                        conn.close()
+                        if exists:
+                            st.error("❌ Senha incorreta. Verifique sua senha e tente novamente.")
+                        else:
+                            st.error("❌ Usuário não encontrado. Verifique o nome de usuário ou cadastre-se.")
         if st.button("Criar conta grátis →"): st.session_state.page="register"; st.rerun()
 
 # ── REGISTER ──
@@ -344,9 +400,19 @@ elif page == "register":
                 elif len(pw)<6: st.error("Mínimo 6 caracteres.")
                 elif pw!=pw2: st.error("Senhas não coincidem.")
                 else:
-                    ok,msg = register_user(username, email, pw)
-                    if ok: st.success(msg); st.session_state.page="login"; st.rerun()
-                    else: st.error(msg)
+                    ok, msg = register_user(username, email, pw)
+                    if ok:
+                        st.success(f"✅ {msg} Bem-vindo, {username}!")
+                        # Verifica se e-mail foi enviado
+                        secrets = st.secrets.get("email", {})
+                        if secrets.get("gmail_user"):
+                            st.info("📧 Um e-mail de boas-vindas foi enviado para " + email)
+                        else:
+                            st.warning("📧 E-mail de boas-vindas não enviado (SMTP não configurado nos Secrets).")
+                        import time; time.sleep(1)
+                        st.session_state.page = "login"; st.rerun()
+                    else:
+                        st.error(msg)
         if st.button("Já tenho conta → Login"): st.session_state.page="login"; st.rerun()
 
 # ── MARKETPLACE ──
