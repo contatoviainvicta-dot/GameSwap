@@ -1,0 +1,66 @@
+# 🎮 GameSwap Brasil
+
+Marketplace para compra, venda e troca de videogames e consoles usados no Brasil.
+
+## ✨ Funcionalidades
+
+- 👤 **Cadastro e Login** de usuários
+- 🛒 **Marketplace** com filtros por plataforma, tipo e preço
+- 📦 **Meus Anúncios** — criar e gerenciar anúncios com fotos
+- 💰 **Sistema de Vendas** com taxa de 5% para a plataforma
+- 🔄 **Sistema de Trocas** entre usuários
+- 💬 **Chat** em tempo real entre compradores e vendedores
+- ⭐ **Avaliações e Reputação** dos usuários
+- ⚙️ **Painel Admin** com métricas e receitas
+
+## 🚀 Como Rodar Localmente
+
+```bash
+# 1. Clone o repositório
+git clone https://github.com/seu-usuario/gameswap-brasil.git
+cd gameswap-brasil
+
+# 2. Instale as dependências
+pip install -r requirements.txt
+
+# 3. Execute o app
+streamlit run app.py
+```
+
+## 🌐 Deploy no Streamlit Cloud
+
+1. Faça upload deste projeto para um repositório GitHub
+2. Acesse [share.streamlit.io](https://share.streamlit.io)
+3. Conecte seu GitHub e selecione o repositório
+4. Defina `app.py` como arquivo principal
+5. Clique em **Deploy**!
+
+## 🔐 Acesso Admin
+
+- **Usuário:** `admin`
+- **Senha:** `admin123`
+
+## 🏗️ Estrutura do Projeto
+
+```
+gameswap/
+├── app.py            # App principal e navegação
+├── database.py       # SQLite - todas as queries
+├── auth.py           # Login e cadastro
+├── marketplace.py    # Listagem e compra
+├── my_listings.py    # Gerenciar anúncios
+├── chat.py           # Mensagens entre usuários
+├── profile.py        # Perfil e histórico
+├── admin.py          # Painel administrativo
+├── style.css         # Tema dark gaming
+└── requirements.txt
+```
+
+## 💡 Próximas Funcionalidades
+
+- [ ] Integração com Pix (pagamento)
+- [ ] Notificações por e-mail
+- [ ] Sistema de wishlist
+- [ ] Filtro por região/estado
+- [ ] App mobile (Streamlit Mobile)
+- [ ] Migração para Supabase (banco online)
